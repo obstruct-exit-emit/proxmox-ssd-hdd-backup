@@ -22,19 +22,28 @@
 
 set -euo pipefail
 
+usage() {
+  echo "Usage: $0 backup /path/to/backup-destination"
+  echo "       $0 restore /path/to/backup-archive.tar.gz"
+  exit 1
+}
+
+if [ "$#" -lt 1 ]; then
+  usage
+fi
+
 MODE="$1"
 shift
 
 
 if [ "$MODE" = "backup" ]; then
+  if [ "$#" -lt 1 ]; then
+    usage
+  fi
   BACKUP_DEST="$1"
   shift
   DATE=$(date +"%Y-%m-%d_%H-%M-%S")
   BACKUP_DIR="$BACKUP_DEST/proxmox-backup-$DATE"
-  if [ -z "$BACKUP_DEST" ]; then
-    echo "Usage: $0 backup /path/to/backup-destination"
-    exit 1
-  fi
   mkdir -p "$BACKUP_DIR"
 
   # Backup VM and container configs
@@ -66,10 +75,13 @@ if [ "$MODE" = "backup" ]; then
 
 
 elif [ "$MODE" = "restore" ]; then
+  if [ "$#" -lt 1 ]; then
+    usage
+  fi
   BACKUP_ARCHIVE="$1"
   shift
-  if [ -z "$BACKUP_ARCHIVE" ]; then
-    echo "Usage: $0 restore /path/to/backup-archive.tar.gz"
+  if [ ! -f "$BACKUP_ARCHIVE" ]; then
+    echo "Backup archive not found: $BACKUP_ARCHIVE"
     exit 1
   fi
   RESTORE_DIR="/tmp/proxmox-restore-$$"
