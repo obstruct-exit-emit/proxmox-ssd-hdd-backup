@@ -36,6 +36,7 @@ MODE="$1"
 shift
 
 
+
 if [ "$MODE" = "backup" ]; then
   if [ "$#" -lt 1 ]; then
     usage
@@ -50,8 +51,37 @@ if [ "$MODE" = "backup" ]; then
   cp -a /etc/pve/qemu-server "$BACKUP_DIR/" 2>/dev/null || echo "No KVM VMs found."
   cp -a /etc/pve/lxc "$BACKUP_DIR/" 2>/dev/null || echo "No LXC containers found."
 
-  # Backup storage config
+  # Backup storage config (full file)
   cp -a /etc/pve/storage.cfg "$BACKUP_DIR/" 2>/dev/null || echo "No storage.cfg found."
+
+  # Scan storage.cfg for drive definitions and save each to a separate file
+  STORAGE_CFG="/etc/pve/storage.cfg"
+  if [ -f "$STORAGE_CFG" ]; then
+    mkdir -p "$BACKUP_DIR/storage-drives"
+    awk -v outdir="$BACKUP_DIR/storage-drives" '
+      /^\s*$/ { next } # skip empty lines
+      /^[a-zA-Z0-9_-]+:/ {
+        if (block) {
+          # Write previous block
+          fname = outdir "/" block_name ".cfg"
+          print block > fname
+          close(fname)
+        }
+        block = $0 "\n"
+        split($1, arr, ":")
+        block_name = arr[1]
+        next
+      }
+      { block = block $0 "\n" }
+      END {
+        if (block) {
+          fname = outdir "/" block_name ".cfg"
+          print block > fname
+          close(fname)
+        }
+      }
+    ' "$STORAGE_CFG"
+  fi
 
   # Backup disk images and container data (default location)
   cp -a /var/lib/vz "$BACKUP_DIR/" 2>/dev/null || echo "No /var/lib/vz found. Check for custom storage locations."
